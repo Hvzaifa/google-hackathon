@@ -14,3 +14,6 @@ pydantic
 # Google deps
 google-genai 
 google-adk 
+
+# Testing
+pytest 

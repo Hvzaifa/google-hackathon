@@ -4,3 +4,9 @@ __pycache__/
 # Environment Files
 .env
 .env.local
+
+# Logs
+debug_traces.log
+
+# Pytest
+.pytest_cache/
