@@ -122,6 +122,8 @@ class MatchingAgent:
         # ── 5. Run multi-factor scoring ───────────────────────────────────
         try:
             ranked: List[ScoredProvider] = multi_factor_scoring(providers, intent)
+            from tools.optimization_tool import apply_workload_tiebreaker
+            ranked = apply_workload_tiebreaker(ranked)
         except Exception as exc:
             return self._error_state(
                 state,
@@ -175,6 +177,7 @@ class MatchingAgent:
                 "distance_km": 5.0,
                 "on_time_score": 0.80,
                 "cancellation_rate": 0.10,
+                "risk_score": 0.20,
                 "review_recency": 0.75,
                 "complexity_level": "intermediate",
                 "base_rate": 500,
@@ -245,6 +248,7 @@ class MatchingAgent:
         available: int,
         status: str,
         reasoning_summary: str,
+        errors: List[str] = None,
     ) -> Dict[str, Any]:
         """Serialise output, write to state, and append trace entry."""
         output = MatchingOutput(
@@ -260,11 +264,12 @@ class MatchingAgent:
             step_name="matching",
             agent_name=self.name,
             input_data=input_data,
-            output_data=output_dict,
+            output_data=dict(output_dict),
             tool_called="multi_factor_scoring",
             start_time=start_time,
             status=status,
             reasoning_summary=reasoning_summary,
+            errors=errors
         )
 
         state["matching"] = output_dict
@@ -293,4 +298,5 @@ class MatchingAgent:
             available=0,
             status="error",
             reasoning_summary=f"Matching agent encountered an error: {error_msg}",
+            errors=[error_msg]
         )
