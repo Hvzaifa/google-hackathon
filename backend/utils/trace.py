@@ -8,34 +8,47 @@ from typing import Any, Dict
 
 def make_trace(
     step_name: str,
-    agent_name: str,
-    input_data: Any,
-    output_data: Any,
-    tool_called: str,
-    start_time: float,
-    status: str,
-    reasoning_summary: str
+    agent_name: str = "UnknownAgent",
+    input_data: Any = None,
+    output_data: Any = None,
+    tool_called: str = "unknown_tool",
+    start_time: float = None,
+    status: str = "success",
+    reasoning_summary: str = "Execution completed",
+    errors: list[str] = None
 ) -> Dict[str, Any]:
     """
     Create a trace entry matching the team contract format.
-    
-    Args:
-        step_name: One of intent, discovery, matching, pricing, booking, quality, dispute
-        agent_name: Name of the agent that performed the step
-        input_data: Input to the agent/step
-        output_data: Output from the agent/step
-        tool_called: Tool/API used
-        start_time: time.time() from before execution
-        status: success, error, fallback, clarification_needed
-        reasoning_summary: Concise decision rationale (not raw CoT)
     """
-    return {
+    import os
+    import json
+
+    trace_entry = {
         "step": step_name,
         "agent_name": agent_name,
         "input": input_data,
         "output": output_data,
         "tool_called": tool_called,
-        "duration_ms": int((time.time() - start_time) * 1000),
+        "duration_ms": int((time.time() - start_time) * 1000) if start_time is not None else 0,
         "status": status,
         "reasoning_summary": reasoning_summary,
+        "errors": errors or []
     }
+
+    # Debug file logging if DEBUG mode is enabled
+    if os.getenv("DEBUG", "false").lower() == "true":
+        try:
+            # Store in backend/debug_traces.log
+            backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            log_file = os.path.join(backend_dir, "debug_traces.log")
+            log_item = {
+                "type": "agent_trace",
+                "timestamp": time.time(),
+                "data": trace_entry
+            }
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_item) + "\n")
+        except Exception:
+            pass
+
+    return trace_entry
