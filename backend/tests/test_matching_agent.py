@@ -121,7 +121,7 @@ def test_tc01_normal_ranking():
     # Shared trace list should have entry appended
     assert len(result["agent_trace"]) == 1
 
-    print(f"  ✓ TC-01 PASSED — Top provider: {matching['ranked_providers'][0]['name']} "
+    print(f"  [OK] TC-01 PASSED — Top provider: {matching['ranked_providers'][0]['name']} "
           f"(score {matching['ranked_providers'][0]['overall_score']:.4f})")
 
 
@@ -156,7 +156,7 @@ def test_tc02_budget_sensitive():
         "Budget King should have higher price_fit than Premium Pro for high budget sensitivity"
     )
 
-    print(f"  ✓ TC-02 PASSED — Budget King price_fit: {price_fits.get('Budget King'):.4f} "
+    print(f"  [OK] TC-02 PASSED — Budget King price_fit: {price_fits.get('Budget King'):.4f} "
           f"vs Premium Pro: {price_fits.get('Premium Pro'):.4f}")
 
 
@@ -203,9 +203,9 @@ def test_tc03_urgent_request():
         f"Top provider's distance score should be high for urgent. Got {top['score_breakdown']['distance']}"
     )
 
-    print(f"  ✓ TC-03 PASSED — Urgent top pick: {top['name']} "
+    print(f"  [OK] TC-03 PASSED — Urgent top pick: {top['name']} "
           f"(distance_score={top['score_breakdown']['distance']:.4f}, "
-          f"reliability={top['score_breakdown']['reliability']:.4f})")
+          f"on_time_score={top['score_breakdown']['on_time_score']:.4f})")
 
 
 def test_tc04_no_available_providers():
@@ -240,7 +240,7 @@ def test_tc04_no_available_providers():
         "reasoning_summary should mention unavailability"
     )
 
-    print(f"  ✓ TC-04 PASSED — status=fallback, reasoning: '{matching['reasoning_summary']}'")
+    print(f"  [OK] TC-04 PASSED — status=fallback, reasoning: '{matching['reasoning_summary']}'")
 
 
 def test_tc05_single_provider():
@@ -277,7 +277,7 @@ def test_tc05_single_provider():
     trace = matching["trace"]
     assert trace["status"] == "fallback"
 
-    print(f"  ✓ TC-05 PASSED — status=fallback, single provider scored: "
+    print(f"  [OK] TC-05 PASSED — status=fallback, single provider scored: "
           f"{matching['ranked_providers'][0]['name']} "
           f"(score={matching['ranked_providers'][0]['overall_score']:.4f})")
 
