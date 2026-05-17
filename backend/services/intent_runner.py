@@ -1,3 +1,4 @@
+from dns import message
 import json
 import os
 import time
@@ -14,6 +15,35 @@ client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY"),
     base_url="https://api.groq.com/openai/v1"
 )
+
+def generate_intent_with_llm(message: str, prompt: str) -> str:
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": INTENT_AGENT_PROMPT},
+                {"role": "user", "content": message},
+            ],
+            temperature=0.2,
+        )
+
+        return response.choices[0].message.content
+
+    except Exception as groq_error:
+        print(f"Groq failed, falling back to Gemini: {groq_error}")
+
+        gemini_client = genai.Client(
+            api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        )
+
+        response = gemini_client.models.generate_content(
+            model="gemini-2.0-flash-lite",
+            contents=prompt,
+        )
+
+        return response.text
+
+
 def _clean_json(text: str) -> str:
     text = text.strip()
 
@@ -38,22 +68,8 @@ User message:
 {message}
 """
 
-    response = client.chat.completions.create(
-    model="llama-3.3-70b-versatile",
-    messages=[
-        {
-            "role": "system",
-            "content": INTENT_AGENT_PROMPT
-        },
-        {
-            "role": "user",
-            "content": message
-        }
-    ],
-    temperature=0.2
-)
-
-    raw = response.choices[0].message.content
+    raw_response = generate_intent_with_llm(message, prompt)
+    raw = _clean_json(raw_response)
 
     try:
         parsed = json.loads(raw)
