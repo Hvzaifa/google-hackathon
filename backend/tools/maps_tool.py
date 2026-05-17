@@ -29,6 +29,9 @@ def load_mock_providers(service_type: str, location: str | None = None) -> list:
         or service.split()[0] in p["service_type"].lower()
     ]
 
+    for p in matched:
+        p.setdefault("risk_score", 0.20)
+
     return matched[:6]
 
 
@@ -110,6 +113,7 @@ def find_nearby_providers(location: str, service_type: str) -> dict:
                 "review_recency": round(random.uniform(0.65, 0.98), 2),
                 "on_time_score": round(random.uniform(0.70, 0.97), 2),
                 "cancellation_rate": round(random.uniform(0.02, 0.25), 2),
+                "risk_score": round(random.uniform(0.05, 0.35), 2),
                 "base_rate": random.choice([400, 500, 600, 700]),
                 "per_km_rate": random.choice([20, 25, 30, 35]),
                 "complexity_level": "intermediate"

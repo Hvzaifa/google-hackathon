@@ -25,19 +25,21 @@ from schemas.matching_schema import (
     IntentData,
     ProviderCandidate,
     ScoreBreakdown,
-    ScoredProvider,
+    ScoredProvider
 )
-
 
 # ── Default weights ─────────────────────────────────────────────────────────
 DEFAULT_WEIGHTS: Dict[str, float] = {
-    "distance": 0.20,
-    "rating": 0.20,
-    "review_recency": 0.10,
-    "reliability": 0.20,
-    "price_fit": 0.15,
-    "specialization": 0.10,
-    "availability": 0.05,
+    "distance":          0.15,
+    "rating":            0.15,
+    "review_recency":    0.08,
+    "on_time_score":     0.12,
+    "cancellation_risk": 0.10,
+    "risk_score":        0.08,
+    "price_fit":         0.12,
+    "specialization":    0.10,
+    "user_preference":   0.05,
+    "availability":      0.05,
 }
 
 
@@ -46,17 +48,14 @@ DEFAULT_WEIGHTS: Dict[str, float] = {
 def _adjust_weights(intent: IntentData) -> Dict[str, float]:
     """
     Return context-adjusted weights based on user intent signals.
-
-    - Urgent requests boost distance and reliability weights.
-    - High budget sensitivity boosts price_fit weight.
-    - Complex jobs boost specialization weight.
     """
     w = DEFAULT_WEIGHTS.copy()
 
     # --- Urgency ---
     if intent.urgency in ("urgent", "same_day"):
         w["distance"] += 0.08
-        w["reliability"] += 0.05
+        w["on_time_score"] += 0.05
+        w["cancellation_risk"] += 0.03
         w["review_recency"] -= 0.05
         w["price_fit"] -= 0.05
         w["specialization"] -= 0.03
@@ -69,12 +68,14 @@ def _adjust_weights(intent: IntentData) -> Dict[str, float]:
     elif intent.budget_sensitivity == "low":
         w["price_fit"] -= 0.05
         w["rating"] += 0.03
-        w["reliability"] += 0.02
+        w["on_time_score"] += 0.01
+        w["cancellation_risk"] += 0.01
 
     # --- Job complexity ---
     if intent.job_complexity == "complex":
         w["specialization"] += 0.08
-        w["reliability"] += 0.04
+        w["on_time_score"] += 0.02
+        w["cancellation_risk"] += 0.02
         w["price_fit"] -= 0.06
         w["distance"] -= 0.06
 
@@ -109,15 +110,41 @@ def _score_review_recency(recency: float) -> float:
     return min(max(recency, 0.0), 1.0)
 
 
-def _score_reliability(on_time: float, cancel_rate: float) -> float:
+def _score_on_time(on_time: float) -> float:
+    """0.0–1.0 passthrough with clamp."""
+    return min(max(on_time, 0.0), 1.0)
+
+
+def _score_cancellation_risk(cancel_rate: float) -> float:
+    """Lower cancellation rate = higher score. cancel_rate is 0.0–1.0."""
+    return 1.0 - min(max(cancel_rate, 0.0), 1.0)
+
+
+def _score_risk(risk_score: float) -> float:
+    """Lower risk_score value = higher match score (risk_score 0 = safest)."""
+    return 1.0 - min(max(risk_score, 0.0), 1.0)
+
+
+def _score_user_preference(provider: ProviderCandidate, preferences: List[str]) -> float:
     """
-    Combined reliability metric:
-        0.65 * on_time_score + 0.35 * (1 - cancellation_rate)
-    Both inputs are 0.0–1.0.
+    Score how many user preferences the provider satisfies.
+    Preferences are free-text strings from intent (e.g. 'female technician', 'certified', 'experienced').
+    Match by checking if any preference keyword appears in provider.name,
+    provider.specialization, or provider.service_type (case-insensitive).
+    Returns 1.0 if all preferences matched, 0.5 if some, 0.2 if none.
+    If no preferences given, return 0.7 (neutral).
     """
-    on_time = min(max(on_time, 0.0), 1.0)
-    cancel_rate = min(max(cancel_rate, 0.0), 1.0)
-    return 0.65 * on_time + 0.35 * (1.0 - cancel_rate)
+    if not preferences:
+        return 0.7
+    provider_text = " ".join(filter(None, [
+        provider.name, provider.specialization, provider.service_type
+    ])).lower()
+    matched = sum(1 for p in preferences if p.lower() in provider_text)
+    if matched == len(preferences):
+        return 1.0
+    elif matched > 0:
+        return 0.5
+    return 0.2
 
 
 def _score_price_fit(
@@ -129,13 +156,6 @@ def _score_price_fit(
 ) -> float:
     """
     Evaluate how well a provider's estimated cost aligns with budget needs.
-
-    Estimated cost = base_rate + per_km_rate * distance_km.
-
-    Strategy by budget_sensitivity:
-      high   → cheaper relative to peers is better (rank normalised)
-      medium → mid-range is ideal (penalise extremes)
-      low    → cost is almost irrelevant; slight preference for mid-range
     """
     estimated_cost = base_rate + per_km_rate * distance_km
 
@@ -169,11 +189,6 @@ def _score_specialization(
 ) -> float:
     """
     How well the provider's complexity level matches the job.
-
-    Perfect match → 1.0
-    Provider can handle harder → 0.8 (overqualified, still fine)
-    Provider is underqualified → 0.4 (risky)
-    Unknown on either side → 0.6 (neutral)
     """
     levels = {"basic": 0, "intermediate": 1, "complex": 2}
 
@@ -204,15 +219,6 @@ def multi_factor_scoring(
 ) -> List[ScoredProvider]:
     """
     Score and rank all providers using deterministic multi-factor analysis.
-
-    This is the tool called by MatchingAgent.run().
-
-    Args:
-        providers: List of validated provider candidates.
-        intent: Structured intent data from Intent Agent.
-
-    Returns:
-        Ranked list of ScoredProvider objects (best first), capped at 5.
     """
     if not providers:
         return []
@@ -231,9 +237,9 @@ def multi_factor_scoring(
         dist_score = _score_distance(provider.distance_km)
         rating_score = _score_rating(provider.rating)
         recency_score = _score_review_recency(provider.review_recency)
-        reliability_score = _score_reliability(
-            provider.on_time_score, provider.cancellation_rate
-        )
+        ontime_score = _score_on_time(provider.on_time_score)
+        cancel_score = _score_cancellation_risk(provider.cancellation_rate)
+        risk_score_val = _score_risk(provider.risk_score)
         price_score = _score_price_fit(
             provider.base_rate,
             provider.per_km_rate,
@@ -244,15 +250,19 @@ def multi_factor_scoring(
         spec_score = _score_specialization(
             provider.complexity_level, intent.job_complexity
         )
+        preference_score = _score_user_preference(provider, intent.user_preferences)
         avail_score = _score_availability(provider.available)
 
         breakdown = ScoreBreakdown(
             distance=round(dist_score, 4),
             rating=round(rating_score, 4),
             review_recency=round(recency_score, 4),
-            reliability=round(reliability_score, 4),
+            on_time_score=round(ontime_score, 4),
+            cancellation_risk=round(cancel_score, 4),
+            risk_score=round(risk_score_val, 4),
             price_fit=round(price_score, 4),
             specialization=round(spec_score, 4),
+            user_preference=round(preference_score, 4),
             availability=round(avail_score, 4),
         )
 
@@ -265,9 +275,12 @@ def multi_factor_scoring(
                 weights["distance"] * dist_score
                 + weights["rating"] * rating_score
                 + weights["review_recency"] * recency_score
-                + weights["reliability"] * reliability_score
+                + weights["on_time_score"] * ontime_score
+                + weights["cancellation_risk"] * cancel_score
+                + weights["risk_score"] * risk_score_val
                 + weights["price_fit"] * price_score
                 + weights["specialization"] * spec_score
+                + weights["user_preference"] * preference_score
                 + weights["availability"] * avail_score
             )
 
@@ -309,7 +322,7 @@ def multi_factor_scoring(
     return result
 
 
-# ── Reasoning builder ───────────────────────────────────────────────────────
+# ── Reasoning builder ───────────────────────────────────────────────
 
 def _build_reasoning(
     provider: ProviderCandidate,
@@ -321,14 +334,16 @@ def _build_reasoning(
     if not provider.available:
         return f"{provider.name} is currently unavailable — excluded from ranking."
 
-    # Find top 2 strengths and top weakness
     factor_scores = {
         "distance": breakdown.distance,
         "rating": breakdown.rating,
         "review_recency": breakdown.review_recency,
-        "reliability": breakdown.reliability,
+        "on_time_score": breakdown.on_time_score,
+        "cancellation_risk": breakdown.cancellation_risk,
+        "risk_score": breakdown.risk_score,
         "price_fit": breakdown.price_fit,
         "specialization": breakdown.specialization,
+        "user_preference": breakdown.user_preference,
     }
 
     # Weighted contribution
