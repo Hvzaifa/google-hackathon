@@ -1,0 +1,16 @@
+# API Handlers
+fastapi 
+openai
+googlemaps 
+geopy
+
+# Environment Files
+python-dotenv 
+
+# Server and validation
+uvicorn 
+pydantic 
+
+# Google deps
+google-genai 
+google-adk 

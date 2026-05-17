@@ -1,3 +1,6 @@
-.env
+# Directories
 __pycache__/
+
+# Environment Files
+.env
 .env.local
