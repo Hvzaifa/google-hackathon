@@ -24,6 +24,9 @@ class ProviderCandidate(BaseModel):
     per_km_rate: int = Field(default=25, ge=0)
     on_time_score: float = Field(default=0.80, ge=0.0, le=1.0)
     cancellation_rate: float = Field(default=0.10, ge=0.0, le=1.0)
+    risk_score: float = Field(default=0.20, ge=0.0, le=1.0,
+        description="Composite risk score: 0 = low risk (good), 1 = high risk (bad). "
+                    "Derived from complaint history, repeated cancellations, blacklist flags.")
     review_recency: float = Field(default=0.75, ge=0.0, le=1.0)
     complexity_level: str = Field(
         default="intermediate",
@@ -65,14 +68,16 @@ class MatchingInput(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ScoreBreakdown(BaseModel):
-    """Per-factor scores making the overall ranking fully transparent."""
-    distance: float = Field(..., ge=0.0, le=1.0, description="Closer is better")
-    rating: float = Field(..., ge=0.0, le=1.0, description="Higher rating is better")
-    review_recency: float = Field(..., ge=0.0, le=1.0, description="More recent reviews = better")
-    reliability: float = Field(..., ge=0.0, le=1.0, description="on_time high, cancellation low = better")
-    price_fit: float = Field(..., ge=0.0, le=1.0, description="Matches user budget sensitivity")
-    specialization: float = Field(..., ge=0.0, le=1.0, description="Complexity match to job")
-    availability: float = Field(..., ge=0.0, le=1.0, description="1.0 if available, 0.0 if not")
+    distance: float = Field(..., ge=0.0, le=1.0)
+    rating: float = Field(..., ge=0.0, le=1.0)
+    review_recency: float = Field(..., ge=0.0, le=1.0)
+    on_time_score: float = Field(..., ge=0.0, le=1.0)       # NEW — split from reliability
+    cancellation_risk: float = Field(..., ge=0.0, le=1.0)   # NEW — split from reliability
+    risk_score: float = Field(..., ge=0.0, le=1.0)          # NEW — composite provider risk
+    price_fit: float = Field(..., ge=0.0, le=1.0)
+    specialization: float = Field(..., ge=0.0, le=1.0)
+    user_preference: float = Field(..., ge=0.0, le=1.0)     # NEW — preference match score
+    availability: float = Field(..., ge=0.0, le=1.0)
 
 
 class ScoredProvider(BaseModel):
