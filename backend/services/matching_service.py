@@ -1,3 +1,29 @@
+from db.supabase_client import supabase
+
+
+def get_reputation_adjustment(provider_name: str) -> dict:
+    result = (
+        supabase
+        .table("provider_reputation")
+        .select("*")
+        .eq("provider_name", provider_name)
+        .execute()
+    )
+
+    if not result.data:
+        return {
+            "reputation_score": 0.75,
+            "future_matching_impact": 0
+        }
+
+    row = result.data[0]
+
+    return {
+        "reputation_score": row.get("reputation_score", 0.75),
+        "future_matching_impact": row.get("future_matching_impact", 0)
+    }
+
+
 def normalize(value, min_value, max_value):
     if max_value == min_value:
         return 1.0
@@ -53,9 +79,30 @@ def rank_providers(providers, intent):
             "ranking_summary": "No providers available."
         }
 
-    distances = [p["distance_km"] for p in providers]
-    ratings = [p["rating"] for p in providers]
-    reviews = [p["review_count"] for p in providers]
+    normalized_providers = []
+
+    for provider in providers:
+        normalized = {
+            **provider,
+            "name": provider.get("name", "Unknown Provider"),
+            "rating": provider.get("rating", 0),
+            "review_count": provider.get("review_count", 0),
+            "distance_km": provider.get("distance_km", 999),
+            "review_recency": provider.get("review_recency", 0.5),
+            "on_time_score": provider.get("on_time_score", 0.5),
+            "cancellation_rate": provider.get("cancellation_rate", 0.5),
+            "base_rate": provider.get("base_rate", 500),
+            "per_km_rate": provider.get("per_km_rate", 30),
+            "complexity_level": provider.get("complexity_level", "intermediate"),
+        }
+
+        normalized_providers.append(normalized)
+
+    providers = normalized_providers
+
+    distances = [p.get("distance_km", 3.0) for p in providers]
+    ratings = [p.get("rating", 0) for p in providers]
+    reviews = [p.get("review_count", 0) for p in providers]
 
     min_distance = min(distances)
     max_distance = max(distances)
@@ -71,19 +118,19 @@ def rank_providers(providers, intent):
     for provider in providers:
 
         distance_score = 1 - normalize(
-            provider["distance_km"],
+            provider.get("distance_km", 3.0),
             min_distance,
             max_distance
         )
 
         rating_score = normalize(
-            provider["rating"],
+            provider.get("rating", 0),
             min_rating,
             max_rating
         )
 
         review_score = normalize(
-            provider["review_count"],
+            provider.get("review_count", 0),
             min_reviews,
             max_reviews
         )
@@ -110,15 +157,24 @@ def rank_providers(providers, intent):
             intent.get("job_complexity")
         )
 
+        reputation = get_reputation_adjustment(
+            provider.get("name")
+        )
+
+        reputation_score = reputation["reputation_score"]
+        future_matching_impact = reputation["future_matching_impact"]
+
         final_score = (
-            distance_score * 0.22 +
-            rating_score * 0.18 +
-            review_score * 0.10 +
+            distance_score * 0.20 +
+            rating_score * 0.16 +
+            review_score * 0.09 +
             review_recency_score * 0.08 +
-            on_time_score * 0.15 +
-            cancellation_score * 0.10 +
-            budget_score * 0.10 +
-            complexity_score * 0.07
+            on_time_score * 0.14 +
+            cancellation_score * 0.09 +
+            budget_score * 0.09 +
+            complexity_score * 0.06 +
+            reputation_score * 0.07 +
+            future_matching_impact * 0.02
         )
 
         provider["matching_scores"] = {
@@ -130,6 +186,8 @@ def rank_providers(providers, intent):
             "cancellation_score": round(cancellation_score, 2),
             "budget_score": round(budget_score, 2),
             "complexity_score": round(complexity_score, 2),
+            "reputation_score": round(reputation_score, 2),
+            "future_matching_impact": round(future_matching_impact, 2),
         }
 
         provider["final_matching_score"] = round(final_score, 3)
@@ -165,7 +223,8 @@ def rank_providers(providers, intent):
             "on_time_score",
             "cancellation_rate",
             "budget_compatibility",
-            "complexity_compatibility"
+            "complexity_compatibility",
+            "provider_reputation_memory"
         ],
 
         "selected_provider": winner,

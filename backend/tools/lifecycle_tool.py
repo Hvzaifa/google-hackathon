@@ -1,4 +1,5 @@
 from datetime import datetime
+import time
 from db.supabase_client import supabase
 
 
@@ -85,6 +86,8 @@ def simulate_booking_lifecycle(booking: dict) -> dict:
     events = []
 
     for step in lifecycle_steps:
+        time.sleep(3)
+
         update_booking_status(
             booking_id=booking_id,
             status=step["status"],

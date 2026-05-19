@@ -97,6 +97,7 @@ User message:
         output_data=parsed,
         tool_called="gemini-2.0-flash-lite",
         start_time=start,
+        trace_type="reasoning"
     )
 
     return {

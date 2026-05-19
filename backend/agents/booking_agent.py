@@ -1,3 +1,4 @@
+from cryptography.hazmat.primitives import constant_time
 from google.adk.agents import LlmAgent
 
 from tools.booking_tool import create_booking_record
@@ -60,6 +61,22 @@ class BookingAgent:
             state["booking"] = {
                 "status": "skipped",
                 "reason": "No provider selected"
+            }
+            return state
+
+        flags = state.get("simulation_flags", {})
+
+        if flags.get("simulate_booking_failure"):
+            state["booking"] = {
+                "status": "booking_pending_local_fallback",
+                "booking_id": "LOCAL-FALLBACK",
+                "booking_status": "pending_sync",
+                "estimated_eta_minutes": None,
+                "database_inserted": False,
+                "booking_summary": (
+                    "Booking could not be saved to Supabase. "
+                    "A local fallback booking was created and should be retried."
+                )
             }
             return state
 
