@@ -2,6 +2,12 @@ from db.supabase_client import supabase
 
 
 def get_reputation_adjustment(provider_name: str) -> dict:
+    if supabase is None:
+        return {
+            "reputation_score": 0.75,
+            "future_matching_impact": 0
+        }
+
     result = (
         supabase
         .table("provider_reputation")
