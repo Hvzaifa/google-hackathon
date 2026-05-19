@@ -359,22 +359,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: kPurple200, width: 1),
-                                    ),
-                                    child: const Center(
-                                      child: Text(
-                                        'G',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF4285F4),
-                                        ),
-                                      ),
+                                  Image.network(
+                                    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png',
+                                    height: 24,
+                                    width: 24,
+                                    errorBuilder: (context, error, stackTrace) => const Icon(
+                                      Icons.g_mobiledata, 
+                                      color: Color(0xFF4285F4), 
+                                      size: 32,
                                     ),
                                   ),
                                   const SizedBox(width: 12),
