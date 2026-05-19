@@ -2,6 +2,7 @@ import 'package:chatbotui/themepage.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:chatbotui/screens/request_screen.dart';
 
 class UsernameScreen extends StatefulWidget {
   const UsernameScreen({super.key});
@@ -33,7 +34,10 @@ class _UsernameScreenState extends State<UsernameScreen> {
       });
       // Navigate to chatbot home
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/chat');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const RequestScreen()),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

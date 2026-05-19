@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/orchestration_provider.dart';
 import '../themepage.dart';
 import 'results_screen.dart';
@@ -91,7 +92,30 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                   child: Row(
                     children: [
                       GestureDetector(
-                        onTap: () => Navigator.pop(context),
+                        onTap: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text('Sign Out', style: GoogleFonts.dmSans(fontWeight: FontWeight.bold, color: AppTheme.kPurple900)),
+                              content: Text('Are you sure you want to sign out of your account?', style: GoogleFonts.dmSans()),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: Text('Cancel', style: GoogleFonts.dmSans(color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: Text('Sign Out', style: GoogleFonts.dmSans(color: Colors.red, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          );
+                          
+                          if (confirm == true) {
+                            await Supabase.instance.client.auth.signOut();
+                          }
+                        },
                         child: Container(
                           width: 38,
                           height: 38,
@@ -101,7 +125,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                             border: Border.all(color: AppTheme.kPurple200),
                           ),
                           child: const Icon(
-                            Icons.arrow_back_ios_new_rounded,
+                            Icons.logout,
                             color: AppTheme.kPurple700,
                             size: 16,
                           ),
