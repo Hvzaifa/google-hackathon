@@ -49,6 +49,9 @@ def create_booking_record(
             "name": selected_provider.get("name")
         },
         "scheduling": schedule,
+        "service_type": intent.get("service_type"),
+        "location": intent.get("location"),
+        "price": pricing.get("price"),
     })
 
     booking_data = {

@@ -1,3 +1,4 @@
+from agents import booking_agent
 from db.supabase_client import supabase
 
 
@@ -7,6 +8,7 @@ def create_notification(
     channel: str,
     title: str,
     message: str,
+    metadata: dict | None = None,
 ) -> dict:
     notification_data = {
         "booking_id": booking_id,
@@ -15,6 +17,7 @@ def create_notification(
         "title": title,
         "message": message,
         "status": "simulated",
+        "metadata": metadata or {},
     }
 
     response = (
@@ -38,9 +41,9 @@ def simulate_notifications(booking: dict) -> dict:
     )
 
     booking_status = booking.get(
-    "booking_status",
-    "confirmed"
-)
+        "booking_status",
+        "confirmed"
+    )
 
     if booking_status == "pending_reschedule":
 
@@ -69,15 +72,30 @@ def simulate_notifications(booking: dict) -> dict:
         message=user_message,
     )
 
+    service_type = booking.get("service_type")
+    location = booking.get("location")
+    price = booking.get("price")
+
     provider_notification = create_notification(
         booking_id=booking_id,
         recipient_type="provider",
         channel="whatsapp_simulated",
         title="New job assigned",
         message=(
-            f"New job assigned for booking {booking_id}. "
-            f"Please confirm availability."
+            f"New {service_type} job assigned. "
+            f"Location: {location}. "
+            f"Scheduled slot: {assigned_slot}. "
+            f"Estimated price: Rs {price}. "
+            f"Booking ID: {booking_id}."
         ),
+        metadata={
+            "booking_id": booking_id,
+            "service_type": service_type,
+            "location": location,
+            "assigned_slot": assigned_slot,
+            "estimated_price": price,
+            "provider_name": provider_name,
+        },
     )
 
     return {
