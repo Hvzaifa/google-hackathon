@@ -1,12 +1,14 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import random
 from db.supabase_client import supabase
 
 
 def resolve_slot(datetime_preference: str | None) -> str:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     if not datetime_preference:
-        return (now + timedelta(hours=3)).isoformat()
+        hours_ahead = random.randint(2, 24)
+        return (now + timedelta(hours=hours_ahead)).isoformat()
 
     text = datetime_preference.lower()
 
@@ -22,7 +24,8 @@ def resolve_slot(datetime_preference: str | None) -> str:
     if "kal" in text or "tomorrow" in text:
         return (now + timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0).isoformat()
 
-    return (now + timedelta(hours=3)).isoformat()
+    hours_ahead = random.randint(2, 24)
+    return (now + timedelta(hours=hours_ahead)).isoformat()
 
 
 def calculate_travel_buffer(distance_km: float | None) -> int:

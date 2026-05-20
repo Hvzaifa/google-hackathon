@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from schemas.request_schemas import IntentRequest
+from schemas.request_schemas import IntentRequest, BookRequest
 from orchestration.service_pipeline import service_pipeline
 from utils.response_formatter import format_orchestration_response
 
@@ -22,6 +22,26 @@ def orchestrate(body: IntentRequest):
         },
     }
 
-    final_state = service_pipeline.run(initial_state)
+    final_state = service_pipeline.run_pre_booking(initial_state)
 
     return format_orchestration_response(final_state)
+
+
+@router.post("/book")
+def book(body: BookRequest):
+    """
+    Phase 2: User-confirmed booking.
+    Receives the pre-booking state and runs BookingAgent + Lifecycle.
+    """
+    state = {
+        "user_id": body.user_id,
+        "intent": body.intent,
+        "selected_provider": body.selected_provider,
+        "pricing": body.pricing,
+        "agent_trace": body.agent_trace,
+        "simulation_flags": body.simulation_flags,
+    }
+
+    final_state = service_pipeline.run_booking(state)
+
+    return format_orchestration_response(final_state)

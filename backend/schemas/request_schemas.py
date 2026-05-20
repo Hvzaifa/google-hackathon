@@ -18,5 +18,14 @@ class FeedbackRequest(BaseModel):
     feedback_text: str
 
 
+class BookRequest(BaseModel):
+    user_id: str = "anonymous"
+    intent: dict
+    selected_provider: dict
+    pricing: dict
+    agent_trace: list = []
+    simulation_flags: dict = {}
+
+
 class SelectSlotRequest(BaseModel):
     selected_slot: str

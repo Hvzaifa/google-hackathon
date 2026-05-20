@@ -34,6 +34,22 @@ class ServisAIOrchestrationPipeline:
     name = "ServisAIOrchestrationPipeline"
 
     def run(self, initial_state: dict) -> dict:
+        """
+        Full pipeline (backward compat / testing).
+        Runs Intent -> Discovery -> Matching -> Pricing -> Booking -> Lifecycle.
+        """
+        state = self.run_pre_booking(initial_state)
+
+        if state["pipeline_status"] != "awaiting_booking_confirmation":
+            return state
+
+        return self.run_booking(state)
+
+    # ────────────────────────────────────────────────────────
+    # Phase 1: Pre-Booking (Intent → Discovery → Matching → Pricing)
+    # ────────────────────────────────────────────────────────
+
+    def run_pre_booking(self, initial_state: dict) -> dict:
         state = initial_state
         state.setdefault("agent_trace", [])
 
@@ -161,7 +177,7 @@ class ServisAIOrchestrationPipeline:
             )
         )
 
-        state["pipeline_status"] = "price_calculated"
+        state["pipeline_status"] = "awaiting_booking_confirmation"
 
         flags = state.get("simulation_flags", {})
 
@@ -187,7 +203,15 @@ class ServisAIOrchestrationPipeline:
                 )
             )
 
-            return state
+        return state
+
+    # ────────────────────────────────────────────────────────
+    # Phase 2: Booking (Booking → Evidence → Lifecycle)
+    # Called ONLY after user confirms via /api/book
+    # ────────────────────────────────────────────────────────
+
+    def run_booking(self, state: dict) -> dict:
+        state.setdefault("agent_trace", [])
 
         # 5. Booking Agent
         booking_start = time.time()
