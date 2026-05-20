@@ -3,9 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/orchestration_response.dart';
 
 class ApiService {
-  // Use your machine's local IP for physical device testing.
-  // Use 10.0.2.2 for Android emulator, localhost for iOS simulator.
   final String baseUrl = 'http://192.168.18.11:8000/api';
+  // final String baseUrl = 'https://service-ai-backend.onrender.com/api';
 
   Future<OrchestrationResponse> orchestrate(
     String message, {
@@ -46,6 +45,7 @@ class ApiService {
     required Map<String, dynamic> pricing,
     required List<Map<String, dynamic>> agentTrace,
     Map<String, dynamic> simulationFlags = const {},
+    List<Map<String, dynamic>> topMatches = const [],
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/book'),
@@ -57,6 +57,7 @@ class ApiService {
         'pricing': pricing,
         'agent_trace': agentTrace,
         'simulation_flags': simulationFlags,
+        'top_matches': topMatches,
       }),
     );
 

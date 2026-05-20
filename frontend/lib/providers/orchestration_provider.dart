@@ -33,6 +33,9 @@ class OrchestrationState {
 }
 
 class OrchestrationNotifier extends Notifier<OrchestrationState> {
+  // Store simulation flags so they survive across Phase 1 → Phase 2
+  Map<String, dynamic> _simulationFlags = {};
+
   @override
   OrchestrationState build() => const OrchestrationState();
 
@@ -44,6 +47,15 @@ class OrchestrationNotifier extends Notifier<OrchestrationState> {
     bool simulatePaymentFailure = false,
     bool simulateProviderCancellation = false,
   }) async {
+    // Persist flags for Phase 2 forwarding
+    _simulationFlags = {
+      'simulate_maps_failure': simulateMapsFailure,
+      'simulate_no_providers': simulateNoProviders,
+      'simulate_booking_failure': simulateBookingFailure,
+      'simulate_payment_failure': simulatePaymentFailure,
+      'simulate_provider_cancellation': simulateProviderCancellation,
+    };
+
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -112,12 +124,25 @@ class OrchestrationNotifier extends Notifier<OrchestrationState> {
           .map((t) => t.toJson())
           .toList();
 
+      // Serialize top matches for cancellation recovery
+      final topMatchesList = (currentResponse.topMatches ?? [])
+          .map((m) => <String, dynamic>{
+                'name': m.name,
+                'rating': m.rating,
+                'distance_km': m.distanceKm,
+                'final_matching_score': m.matchingScore,
+                'address': m.address,
+              })
+          .toList();
+
       final bookingResponse = await api.confirmBooking(
         userId: 'demo_user',
         intent: intentMap,
         selectedProvider: providerMap,
         pricing: pricingMap,
         agentTrace: traceList,
+        simulationFlags: _simulationFlags,
+        topMatches: topMatchesList,
       );
 
       // Merge booking response into current state
@@ -147,6 +172,7 @@ class OrchestrationNotifier extends Notifier<OrchestrationState> {
   }
 
   void reset() {
+    _simulationFlags = {};
     state = const OrchestrationState();
   }
 }

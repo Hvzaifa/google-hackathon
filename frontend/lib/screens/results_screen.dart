@@ -275,6 +275,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
 
     String dataSource = 'Unknown';
     bool isGoogleMapsData = false;
+    String? fallbackReason;
     for (final trace in data.agentTrace ?? []) {
       if (trace.step?.toLowerCase() == 'discovery') {
         final tool = trace.toolCalled ?? '';
@@ -283,6 +284,9 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
           isGoogleMapsData = true;
         } else {
           dataSource = 'Mock / Fallback Data';
+          if (trace.output is Map) {
+            fallbackReason = (trace.output as Map)['fallback_reason']?.toString();
+          }
         }
         break;
       }
@@ -292,10 +296,13 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
       padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 16),
       children: [
         if (data.status != null) _buildStatusBadge(context, data.status!),
-        _buildDataSourceBadge(context, dataSource, isGoogleMapsData),
+        _buildDataSourceBadge(context, dataSource, isGoogleMapsData, fallbackReason),
 
         if (data.fallbackResponse != null)
-          _buildFallbackCard(context, data.fallbackResponse!['message']?.toString() ?? 'Something went wrong.'),
+          _buildFallbackCard(context, data.fallbackResponse!),
+
+        if (data.paymentFallback != null)
+          _buildPaymentFallbackCard(context, data.paymentFallback!),
 
         if (data.requestUnderstanding != null) ...[
           RequestUnderstandingCard(data: data.requestUnderstanding!),
@@ -318,8 +325,8 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
           const SizedBox(height: 16),
         ],
 
-        // Booking confirmation gate — show button only before booking
-        if (data.selectedProvider != null && data.pricing != null && !_bookingConfirmed && data.booking == null) ...[
+        // Booking confirmation gate — hide when payment failed or already booked
+        if (data.selectedProvider != null && data.pricing != null && !_bookingConfirmed && data.booking == null && data.paymentFallback == null) ...[
           _buildConfirmBookingCard(context, state.isBooking),
           const SizedBox(height: 16),
         ],
@@ -329,6 +336,13 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
           BookingCard(booking: data.booking!),
           const SizedBox(height: 16),
         ],
+
+        // Cancellation fallback card
+        if (data.cancellationFallback != null && _bookingConfirmed) ...[
+          _buildCancellationFallbackCard(context, data.cancellationFallback!),
+          const SizedBox(height: 16),
+        ],
+
         if (data.lifecycle != null && _bookingConfirmed) ...[
           LifecycleTimeline(lifecycle: data.lifecycle!),
           const SizedBox(height: 16),
@@ -473,8 +487,13 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
     );
   }
 
-  Widget _buildDataSourceBadge(BuildContext context, String dataSource, bool isLive) {
+  Widget _buildDataSourceBadge(BuildContext context, String dataSource, bool isLive, [String? fallbackReason]) {
     final theme = Theme.of(context);
+    final subtitle = isLive
+        ? 'Providers found via Google Maps Places + Geocoding APIs'
+        : fallbackReason != null
+            ? 'Maps failed: $fallbackReason — mock fallback used'
+            : 'Using pre-loaded mock providers (Maps API key missing or no results)';
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -493,7 +512,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
               children: [
                 Text('Data Source: $dataSource', style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w600, color: isLive ? Colors.green[800] : Colors.orange[800])),
                 Text(
-                  isLive ? 'Providers found via Google Maps Places + Geocoding APIs' : 'Using pre-loaded mock providers (Maps API key missing or no results)',
+                  subtitle,
                   style: GoogleFonts.dmSans(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
               ],
@@ -505,19 +524,165 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen>
   }
 
   // ─── Cards ────────────────────────────────────────────────
-  Widget _buildFallbackCard(BuildContext context, String message) {
+  Widget _buildFallbackCard(BuildContext context, Map<String, dynamic> fallback) {
     final theme = Theme.of(context);
+    final message = fallback['message']?.toString() ?? 'Something went wrong.';
+    final alternatives = fallback['alternatives'];
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.amber.withValues(alpha: 0.25))),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.warning_amber_rounded, size: 18, color: Colors.amber[700]),
-          const SizedBox(width: 10),
-          Expanded(child: Text(message, style: GoogleFonts.dmSans(fontSize: 13, color: theme.colorScheme.onSurface, height: 1.4))),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 18, color: Colors.amber[700]),
+              const SizedBox(width: 10),
+              Expanded(child: Text(message, style: GoogleFonts.dmSans(fontSize: 13, color: theme.colorScheme.onSurface, height: 1.4))),
+            ],
+          ),
+          if (alternatives is List && alternatives.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('Suggestions:', style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w600, color: theme.colorScheme.primary)),
+            const SizedBox(height: 6),
+            ...alternatives.map((alt) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.arrow_right_rounded, size: 16, color: theme.colorScheme.primary),
+                  const SizedBox(width: 4),
+                  Expanded(child: Text(alt.toString(), style: GoogleFonts.dmSans(fontSize: 12, color: theme.colorScheme.onSurface))),
+                ],
+              ),
+            )),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentFallbackCard(BuildContext context, Map<String, dynamic> fallback) {
+    final theme = Theme.of(context);
+    final message = fallback['message']?.toString() ?? 'Payment confirmation failed.';
+    final action = fallback['recommended_action']?.toString();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(9)),
+                child: Icon(Icons.payment_rounded, size: 16, color: Colors.red[700]),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text('Payment Failed', style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.red[700]))),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(message, style: GoogleFonts.dmSans(fontSize: 13, color: theme.colorScheme.onSurface, height: 1.4)),
+          if (action != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                children: [
+                  Icon(Icons.lightbulb_outline_rounded, size: 14, color: Colors.red[400]),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(action, style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface))),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCancellationFallbackCard(BuildContext context, Map<String, dynamic> fallback) {
+    final theme = Theme.of(context);
+    final cancelled = fallback['cancelled_provider']?.toString() ?? 'Unknown';
+    final replacement = fallback['replacement_provider'];
+    final replacementName = replacement is Map ? replacement['name']?.toString() : null;
+    final status = fallback['status']?.toString() ?? '';
+    final message = fallback['message']?.toString() ?? '';
+    final dbInserted = fallback['database_inserted'] == true;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.deepOrange.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(color: Colors.deepOrange.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(9)),
+                child: Icon(Icons.swap_horiz_rounded, size: 18, color: Colors.deepOrange[700]),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  status == 'replacement_provider_selected' ? 'Provider Cancelled → Replacement Selected' : 'Provider Cancelled',
+                  style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.deepOrange[700]),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildCancellationRow(context, 'Cancelled', cancelled, Colors.red),
+          if (replacementName != null)
+            _buildCancellationRow(context, 'Replacement', replacementName, Colors.green),
+          const SizedBox(height: 8),
+          Text(message, style: GoogleFonts.dmSans(fontSize: 12, color: theme.colorScheme.onSurface, height: 1.4)),
+          if (dbInserted) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.green[600]),
+                const SizedBox(width: 6),
+                Text('Waitlist record created in database', style: GoogleFonts.dmSans(fontSize: 11, color: Colors.green[700], fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCancellationRow(BuildContext context, String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 8, height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text('$label: ', style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.secondary)),
+          Expanded(child: Text(value, style: GoogleFonts.dmSans(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface))),
         ],
       ),
     );

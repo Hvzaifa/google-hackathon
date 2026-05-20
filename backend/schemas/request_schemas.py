@@ -25,6 +25,7 @@ class BookRequest(BaseModel):
     pricing: dict
     agent_trace: list = []
     simulation_flags: dict = {}
+    top_matches: list = []
 
 
 class SelectSlotRequest(BaseModel):

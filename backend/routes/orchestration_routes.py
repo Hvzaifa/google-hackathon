@@ -40,6 +40,7 @@ def book(body: BookRequest):
         "pricing": body.pricing,
         "agent_trace": body.agent_trace,
         "simulation_flags": body.simulation_flags,
+        "matching": {"top_matches": body.top_matches},
     }
 
     final_state = service_pipeline.run_booking(state)

@@ -11,9 +11,9 @@ class LifecycleEvent {
 
   factory LifecycleEvent.fromJson(Map<String, dynamic> json) {
     return LifecycleEvent(
-      event: json['event'],
-      timestamp: json['timestamp'],
-      details: json['details'],
+      event: json['event'] ?? json['event_type'],
+      timestamp: json['timestamp'] ?? json['created_at'],
+      details: json['details'] ?? json['message'],
     );
   }
 }
