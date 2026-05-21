@@ -47,9 +47,9 @@ The project is structured as a monorepo containing both the backend agentic serv
    - Create a `.env` file containing necessary API keys (e.g., OpenAI, Google Maps).
 4. Run the backend server:
    ```bash
-   uvicorn main:app --reload --host 127.0.0.1 --port 8000
+   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
    ```
-   The backend will be available at `http://127.0.0.1:8000` (check `/api/health` for status).
+   The backend will be available at `http://YOUR_IP_ADDRESS:8000` (check `/api/health` for status).
 
 ### 2. Frontend Setup
 
